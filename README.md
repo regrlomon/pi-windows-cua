@@ -1,128 +1,88 @@
 # pi-windows-cua
 
-A [Pi](https://pi.dev) extension that lets Pi drive local **Windows** apps through
-[cua-driver](https://github.com/trycua/cua) — screenshot, read the UIA/accessibility tree,
-click, and type into native desktop applications, no remote sandbox required.
+Let the [Pi](https://pi.dev) coding agent drive your local **Windows** apps — open
+software, click buttons, type text, and read what's on screen, all through plain
+language.
 
-Inspired by (and structurally mirroring) the community extension
-[`pi-macos-cua`](https://pi.dev/packages/pi-macos-cua) by tanishqkancharla.
+Pi + this extension = your agent can use real desktop software (Notepad, Chrome,
+IDEs, chat clients…), not just the terminal.
 
-## Quick start
+## Install (one-time, about a minute)
 
-1. Install the [Pi coding agent](https://pi.dev), then:
+1. Install [Pi](https://pi.dev)
+2. Install the extension:
 
    ```bash
    pi install npm:pi-windows-cua
    ```
 
-2. Start `pi` and run:
+3. Start `pi` and run:
 
    ```
    /install-cua-driver
    ```
 
-   That's it — the command runs the official cua-driver installer for you
-   (user-scope, no admin, no permission dialogs on Windows). A manual alternative:
+   The extension installs the [cua-driver](https://github.com/trycua/cua) engine for
+   you — user-scope, no admin rights, no permission dialogs.
 
-   ```powershell
-   powershell -c "irm https://cua.ai/driver/install.ps1 | iex"
-   ```
+Done. If the status bar shows `windows-cua: daemon:on`, you're ready.
 
-3. Verify and play:
+## Use it — just talk to Pi
 
-   ```
-   /windows-cua-status
-   ```
+There is nothing to configure. Try saying:
 
-   Then just ask Pi: *"use windows_cua_exec to open Notepad and type hello"*.
+- *"Open Notepad and type hello world"*
+- *"Open Chrome and go to github.com"*
+- *"What buttons are in the Settings window right now?"*
+- *"Read the calculator display and tell me the number"*
 
-### Install from a local checkout
+Pi figures out the steps and you watch them happen on screen.
 
-```bash
-pi install /absolute/path/to/pi-windows-cua
-```
+> Tip: driving an app works best one step at a time — ask Pi to look at the window,
+> then act, then look again. Pi already knows this; you don't have to manage it.
 
-## Usage
+## Slash commands
 
-The extension registers one tool, `windows_cua_exec`, which runs a short JavaScript
-sequence in a persistent Node REPL with CUA helpers:
+| Command | What it does |
+|---|---|
+| `/install-cua-driver` | Install the cua-driver engine |
+| `/windows-cua-status` | Show engine health and configuration |
+| `/windows-cua-stop` | Stop the background engine |
+| `/windows-cua-diagnose` | Collect diagnostics (useful for bug reports) |
 
-```js
-const apps = await listApps();
-const app = await launchApp({ name: "Notepad" });
-const wins = await listWindows({ pid: app.pid });
-const state = await getWindowState({ pid: app.pid, window_id: wins[0].window_id });
-await click({ pid: app.pid, window_id: wins[0].window_id, element_index: 2 });
-await typeText({ pid: app.pid, text: "hello from pi" });
-return "done";
-```
+## Good to know
 
-### Helpers
+- **Focus may briefly switch when typing into Chrome / Edge / VS Code.** Modern
+  Chromium-based apps only accept simulated keystrokes while focused, so Pi briefly
+  brings the target window to front for that one action. Simple apps like Notepad can
+  be driven entirely in the background.
+- **A few windows can never be automated**: apps running elevated (Task Manager, UAC
+  prompts) are protected by Windows itself.
+- **Telemetry**: the underlying cua-driver sends content-free usage statistics by
+  default. Opt out any time with `cua-driver telemetry disable`.
 
-| Helper | Driver tool | Notes |
-|---|---|---|
-| `invoke(tool, args)` | any | Escape hatch for tools without a wrapper |
-| `checkPermissions()` | `check_permissions` | Probe capture/input health |
-| `listApps()` | `list_apps` | |
-| `launchApp({ name \| bundle_id, urls? })` | `launch_app` | `name` = executable/display name; on Windows `bundle_id` = executable path |
-| `listWindows({ pid?, on_screen_only? })` | `list_windows` | |
-| `getWindowState({ pid, window_id, query? })` | `get_window_state` | Heavy fields omitted; returns screenshot as image |
-| `click({ pid, window_id?, element_index? \| x, y, ... })` | `click` | element-index preferred over pixels |
-| `typeText({ pid, text, element_index?, window_id?, delivery_mode? })` | `type_text` | `delivery_mode`: `foreground` needed for Chromium/Electron targets |
-| `setValue({ pid, window_id, element_index, value })` | `set_value` | Background-safe (UIA) |
-| `pressKey({ pid, key, modifiers?, delivery_mode? })` | `press_key` | Same `delivery_mode` rule as typeText |
-| `hotkey({ pid, keys, delivery_mode? })` | `hotkey` | Same `delivery_mode` rule as typeText |
-| `scroll({ pid, direction, ... })` | `scroll` | |
-| `sleep(ms)` | — | Abort-aware delay |
-| `state` / `clearState()` | — | Persist plain data across calls |
+## Troubleshooting
 
-### Slash commands
+| Symptom | Fix |
+|---|---|
+| Status bar says `run /install-cua-driver` | Run `/install-cua-driver` |
+| Status bar says `daemon:off` | It auto-starts on the next action; or run `/windows-cua-status` |
+| App didn't react to a click/typing | Ask Pi: *"check the window state again"* — minimized or elevated windows can't receive input |
+| Something looks broken | Run `/windows-cua-diagnose` and include the output in a bug report |
 
-- `/install-cua-driver` — print the official install command
-- `/windows-cua-status` — config, resolved binary, daemon status
-- `/windows-cua-stop` — stop the background daemon
-- `/windows-cua-diagnose` — insert `cua-driver doctor` output into the editor
+## For developers
 
-## Configuration
+Technical reference — helper functions, delivery modes, configuration files, and the
+driver JSON contract — lives in [docs/HELPERS.md](docs/HELPERS.md).
 
-Environment variables (take precedence):
-
-- `PI_WINDOWS_CUA_BINARY` — explicit path to `cua-driver.exe`
-- `PI_WINDOWS_CUA_AUTOSTART` — auto-start daemon on demand (`1`/`true`, default on)
-- `PI_WINDOWS_CUA_START_TIMEOUT_MS` — daemon start timeout (default `15000`)
-
-Or config files (JSON):
-
-- `~/.pi/agent/windows-cua.json` — user scope
-- `<project>/.pi/windows-cua.json` — project scope
-
-```json
-{ "binaryPath": "C:\\Users\\me\\AppData\\Local\\Programs\\cua-driver\\cua-driver.exe" }
-```
-
-## Notes & caveats
-
-- The extension shells out to `cua-driver call --raw --compact`. Verified against
-  cua-driver **0.28.1 (x86_64-windows)**: `--raw` emits bare business JSON there, which
-  the driver layer normalizes (older releases wrapped results MCP-style; both shapes are
-  accepted). If a future release changes the contract again, parsing fails loudly —
-  pin or update the driver (`cua-driver update`).
-- The driver sends content-free telemetry by default; opt out with
-  `cua-driver telemetry disable`.
-- Windows has no macOS-style TCC permission prompts, but elevated windows (Task Manager,
-  UAC dialogs) run at a higher integrity level and cannot be automated.
-- Helper tool names/parameters mirror cua-driver's documented cross-platform CLI
-  surface. If a call fails with "unknown tool", fall back to `invoke("<tool>", {...})`.
-
-## Development
+中文说明见 [README.zh-CN.md](README.zh-CN.md)。
 
 ```bash
 npm install
 npm run check   # tsc --noEmit
 ```
 
-Pi loads the extension source directly via jiti; there is no build step. Use `/reload`
-inside Pi after edits.
+Pi loads the extension source directly; use `/reload` inside Pi after edits.
 
 ## License
 
@@ -130,6 +90,6 @@ inside Pi after edits.
 
 ## Acknowledgments
 
-- [trycua/cua](https://github.com/trycua) — the cua-driver this extension wraps
+- [trycua/cua](https://github.com/trycua) — the cua-driver engine this extension wraps
 - [pi-macos-cua](https://pi.dev/packages/pi-macos-cua) by tanishqkancharla — the macOS
   sibling whose architecture this project mirrors
