@@ -4,6 +4,12 @@
   "description": "Pi extension that lets Pi drive local Windows apps through cua-driver.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/regrlomon/pi-windows-cua.git"
+  },
+  "homepage": "https://github.com/regrlomon/pi-windows-cua#readme",
+  "bugs": "https://github.com/regrlomon/pi-windows-cua/issues",
   "keywords": [
     "pi-package",
     "pi-extension",
