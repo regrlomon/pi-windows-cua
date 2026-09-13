@@ -19,9 +19,9 @@ type ExecTraceEntry = {
   result: PiDriverToolResult;
 };
 
-function assertLaunchTarget(params: { name?: string }): void {
-  if (!params.name) {
-    throw new Error("windows_cua_launch_app requires name (an executable or display name, e.g. 'Notepad').");
+function assertLaunchTarget(params: { bundle_id?: string; name?: string }): void {
+  if (!params.bundle_id && !params.name) {
+    throw new Error("windows_cua_launch_app requires name (executable/display name) or bundle_id (executable path on Windows).");
   }
 }
 
@@ -98,7 +98,7 @@ function createExecHelpers(ctx: ExtensionContext, signal: AbortSignal | undefine
     checkPermissions: async (params: { prompt?: boolean } = {}) =>
       record("checkPermissions", "check_permissions", { prompt: params.prompt ?? false }, { ensureDaemon: false }),
     listApps: async () => record("listApps", "list_apps", {}, { ensureDaemon: false }),
-    launchApp: async (params: { name: string; urls?: string[] }) => {
+    launchApp: async (params: { name?: string; bundle_id?: string; urls?: string[] }) => {
       assertLaunchTarget(params);
       return record("launchApp", "launch_app", params, { ensureDaemon: true });
     },

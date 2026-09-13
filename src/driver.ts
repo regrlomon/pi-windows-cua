@@ -31,6 +31,20 @@ type DriverRawResult = {
   isError?: boolean;
 };
 
+// cua-driver >= 0.28 emits bare business JSON from `call --raw` (e.g. {"apps": ...});
+// older releases wrapped results as MCP-style {content, structuredContent}. Normalize
+// both so downstream handling has a single shape.
+function normalizeDriverRaw(value: Record<string, unknown>): DriverRawResult {
+  if (Array.isArray(value.content)) {
+    return value as DriverRawResult;
+  }
+  return {
+    content: [],
+    structuredContent: value,
+    isError: value.isError === true,
+  };
+}
+
 type PiTextBlock = { type: "text"; text: string };
 type PiImageBlock = { type: "image"; data: string; mimeType: string };
 
@@ -140,8 +154,10 @@ export class WindowsCuaDriver {
       );
     }
 
-    const content = this.buildPiContent(parsed, options.omitStructuredFields ?? []);
-    if (parsed.isError || execResult.code !== 0) {
+    const normalized = normalizeDriverRaw(parsed);
+
+    const content = this.buildPiContent(normalized, options.omitStructuredFields ?? []);
+    if (normalized.isError || execResult.code !== 0) {
       const message = this.contentToText(content)
         || execResult.stderr.trim()
         || `${toolName} failed.`;
@@ -153,7 +169,7 @@ export class WindowsCuaDriver {
       details: {
         driverTool: toolName,
         binaryPath,
-        structuredContent: parsed.structuredContent ?? null,
+        structuredContent: normalized.structuredContent ?? null,
         stdout: execResult.stdout,
         stderr: execResult.stderr,
         exitCode: execResult.code,
@@ -220,12 +236,7 @@ export class WindowsCuaDriver {
       config.binaryPath,
       ...pathsFromEnv("cua-driver.exe"),
       ...pathsFromEnv("cua-driver"),
-      process.env.LOCALAPPDATA
-        ? join(process.env.LOCALAPPDATA, "Programs", "cua-driver", "cua-driver.exe")
-        : undefined,
-      process.env.LOCALAPPDATA
-        ? join(process.env.LOCALAPPDATA, "cua-driver", "cua-driver.exe")
-        : undefined,
+      ...localAppdataCandidates(),
     ].filter((candidate): candidate is string => Boolean(candidate));
 
     for (const candidate of candidates) {
@@ -234,11 +245,12 @@ export class WindowsCuaDriver {
     return null;
   }
 
-  private tryParseRaw(stdout: string): DriverRawResult | null {
+  private tryParseRaw(stdout: string): Record<string, unknown> | null {
     const trimmed = stdout.trim();
     if (!trimmed.startsWith("{")) return null;
     try {
-      return JSON.parse(trimmed) as DriverRawResult;
+      const parsed = JSON.parse(trimmed) as unknown;
+      return isRecord(parsed) ? parsed : null;
     } catch {
       return null;
     }
@@ -328,6 +340,18 @@ function pathsFromEnv(binaryName: string): string[] {
     .split(delimiter)
     .filter(Boolean)
     .map((entry) => join(entry, binaryName));
+}
+
+// The official install.ps1 places the binary under
+// %LOCALAPPDATA%\Programs\Cua\cua-driver\bin; older/custom layouts are kept as fallbacks.
+function localAppdataCandidates(): string[] {
+  const localAppdata = process.env.LOCALAPPDATA;
+  if (!localAppdata) return [];
+  return [
+    join(localAppdata, "Programs", "Cua", "cua-driver", "bin", "cua-driver.exe"),
+    join(localAppdata, "Programs", "cua-driver", "cua-driver.exe"),
+    join(localAppdata, "cua-driver", "cua-driver.exe"),
+  ];
 }
 
 async function sleep(ms: number, signal?: AbortSignal): Promise<void> {

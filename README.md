@@ -56,7 +56,7 @@ return "done";
 | `invoke(tool, args)` | any | Escape hatch for tools without a wrapper |
 | `checkPermissions()` | `check_permissions` | Probe capture/input health |
 | `listApps()` | `list_apps` | |
-| `launchApp({ name, urls? })` | `launch_app` | `name` = executable or display name |
+| `launchApp({ name \| bundle_id, urls? })` | `launch_app` | `name` = executable/display name; on Windows `bundle_id` = executable path |
 | `listWindows({ pid?, on_screen_only? })` | `list_windows` | |
 | `getWindowState({ pid, window_id, query? })` | `get_window_state` | Heavy fields omitted; returns screenshot as image |
 | `click({ pid, window_id?, element_index? \| x, y, ... })` | `click` | element-index preferred over pixels |
@@ -94,12 +94,15 @@ Or config files (JSON):
 
 ## Notes & caveats
 
-- The extension shells out to `cua-driver call --raw --compact`. If a future driver
-  release changes that raw JSON contract, parsing will fail loudly — pin or update the
-  driver (`cua-driver update`).
-- Windows has no macOS-style TCC permission prompts, but per-monitor capture and UIA
-  access can still be affected by elevated windows (Task Manager, UAC dialogs) running
-  at a higher integrity level; those cannot be automated.
+- The extension shells out to `cua-driver call --raw --compact`. Verified against
+  cua-driver **0.28.1 (x86_64-windows)**: `--raw` emits bare business JSON there, which
+  the driver layer normalizes (older releases wrapped results MCP-style; both shapes are
+  accepted). If a future release changes the contract again, parsing fails loudly —
+  pin or update the driver (`cua-driver update`).
+- The driver sends content-free telemetry by default; opt out with
+  `cua-driver telemetry disable`.
+- Windows has no macOS-style TCC permission prompts, but elevated windows (Task Manager,
+  UAC dialogs) run at a higher integrity level and cannot be automated.
 - Helper tool names/parameters mirror cua-driver's documented cross-platform CLI
   surface. If a call fails with "unknown tool", fall back to `invoke("<tool>", {...})`.
 
