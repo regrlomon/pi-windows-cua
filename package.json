@@ -1,0 +1,39 @@
+{
+  "name": "pi-windows-cua",
+  "version": "0.1.0",
+  "description": "Pi extension that lets Pi drive local Windows apps through cua-driver.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "cua",
+    "computer-use",
+    "windows"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "echo 'pi loads this package directly via jiti; no build step required'"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@types/node": "^24.0.0",
+    "typebox": "^1.1.32",
+    "typescript": "^5.8.3"
+  }
+}
