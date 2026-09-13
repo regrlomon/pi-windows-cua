@@ -8,6 +8,9 @@ import { WindowsCuaDriver, type InvokeOptions, type PiDriverToolResult } from ".
 
 const SEQUENTIAL: ToolExecutionMode = "sequential";
 const GET_WINDOW_STATE_OMIT_FIELDS = ["tree_markdown", "screenshot_png_b64", "screenshot_mime_type"];
+// Stripped from the value returned to the REPL: the base64 screenshot is megabytes and
+// would flood the tool result; tree_markdown and everything else stay reachable.
+const UNWRAP_OMIT_FIELDS = ["screenshot_png_b64", "screenshot_mime_type"];
 
 let piRef: ExtensionAPI;
 let windowsCua: WindowsCuaDriver;
@@ -84,13 +87,13 @@ function createExecHelpers(ctx: ExtensionContext, signal: AbortSignal | undefine
     toolName: string,
     args: Record<string, unknown>,
     options: InvokeOptions = {},
-  ): Promise<PiDriverToolResult> => {
+  ): Promise<unknown> => {
     assertExecStillActive(signal);
     const argsSnapshot = cloneForTrace(args);
     const result = await callDriverTool(ctx, toolName, args, signal, options);
     trace.push({ helper, args: argsSnapshot, result });
     assertExecStillActive(signal);
-    return result;
+    return unwrapDriverResult(result);
   };
 
   return {
@@ -166,6 +169,23 @@ function cloneForTrace(value: Record<string, unknown>): Record<string, unknown> 
   } catch {
     return { ...value };
   }
+}
+
+// Helpers hand the driver's structured JSON straight back to the REPL so chained
+// expressions like (await launchApp({...})).pid resolve; only the payload-sized
+// screenshot fields are dropped. The full wrapped result stays in the trace.
+function unwrapDriverResult(result: PiDriverToolResult): unknown {
+  const structured = result.details.structuredContent;
+  if (!isPlainRecord(structured)) return result;
+  const copy: Record<string, unknown> = { ...structured };
+  for (const field of UNWRAP_OMIT_FIELDS) {
+    delete copy[field];
+  }
+  return copy;
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function assertExecStillActive(signal?: AbortSignal): void {
@@ -394,7 +414,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", async (event) => ({
     systemPrompt:
       event.systemPrompt
-      + "\n\nWhen doing local Windows computer use: if cua-driver is missing, ask the user to run /install-cua-driver first. Use the windows_cua_exec tool for all Windows CUA actions. Inside windows_cua_exec, use helpers like launchApp(), listWindows(), getWindowState(), click(), typeText(), setValue(), pressKey(), hotkey(), scroll(), and checkPermissions(). Prefer launchApp() over `start` in the shell; call getWindowState() before element-indexed GUI actions; prefer element_index interactions over raw pixel clicks when the AX/UIA tree exposes the target; after UI-changing actions, re-snapshot with getWindowState() before the next action. If the target window is minimized, occluded, or loses focus, element actions may fail — recover with launchApp() or a pixel click, then re-snapshot. Persist cross-call values in state.* when needed.",
+      + "\n\nWhen doing local Windows computer use: if cua-driver is missing, ask the user to run /install-cua-driver first. Use the windows_cua_exec tool for all Windows CUA actions. Inside windows_cua_exec, use helpers like launchApp(), listWindows(), getWindowState(), click(), typeText(), setValue(), pressKey(), hotkey(), scroll(), and checkPermissions(). Helpers return the driver's plain JSON directly, so chaining works (const app = await launchApp({ name: 'Notepad' }); app.pid is valid; listWindows returns { windows: [...] } with window_id per entry). Prefer launchApp() over `start` in the shell; call getWindowState() before element-indexed GUI actions; prefer element_index interactions over raw pixel clicks when the AX/UIA tree exposes the target; after UI-changing actions, re-snapshot with getWindowState() before the next action. If the target window is minimized, occluded, or loses focus, element actions may fail — recover with launchApp() or a pixel click, then re-snapshot. Persist cross-call values in state.* when needed.",
   }));
 
   pi.registerCommand("install-cua-driver", {
@@ -478,6 +498,7 @@ export default function (pi: ExtensionAPI) {
       "Use windows_cua_exec for all Windows CUA actions in this extension.",
       "The code runs as the body of an async function, so use await and return your final value explicitly.",
       "Available helpers: invoke, checkPermissions, listApps, launchApp, listWindows, getWindowState, click, typeText, setValue, pressKey, hotkey, scroll, sleep, state, clearState, console.",
+      "Helpers return the driver's plain JSON, so chaining works: const app = await launchApp({ name: 'Notepad' }); then app.pid or (await listWindows({ pid: app.pid })).windows[0].window_id.",
       "If your code uses element_index, call getWindowState() first and usually again after UI-changing actions.",
     ],
     parameters: Type.Object({

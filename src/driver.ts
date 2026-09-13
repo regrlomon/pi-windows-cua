@@ -130,6 +130,12 @@ export class WindowsCuaDriver {
   ): Promise<PiDriverToolResult> {
     await this.assertInstalled(config);
 
+    if (!isRecord(args)) {
+      throw new Error(
+        `${toolName} expects a JSON object argument (e.g. {pid: 123, window_id: 456}); got ${argSummary(args)}. Helpers return the driver's plain JSON, so chained values like (await launchApp({...})).pid are valid.`,
+      );
+    }
+
     if (options.ensureDaemon !== false) {
       await this.ensureDaemonRunning(config, signal);
     }
@@ -322,6 +328,12 @@ function sanitizeStructuredContent(value: unknown, omitFields: string[]): unknow
 
 function isRecord(value: unknown): value is Record<string, any> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function argSummary(value: unknown): string {
+  if (value === undefined) return "undefined";
+  if (value === null) return "null";
+  return `${typeof value} ${JSON.stringify(value).slice(0, 120)}`;
 }
 
 async function isFile(path: string): Promise<boolean> {
