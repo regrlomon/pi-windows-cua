@@ -60,10 +60,10 @@ return "done";
 | `listWindows({ pid?, on_screen_only? })` | `list_windows` | |
 | `getWindowState({ pid, window_id, query? })` | `get_window_state` | Heavy fields omitted; returns screenshot as image |
 | `click({ pid, window_id?, element_index? \| x, y, ... })` | `click` | element-index preferred over pixels |
-| `typeText({ pid, text, element_index?, window_id? })` | `type_text` | |
-| `setValue({ pid, window_id, element_index, value })` | `set_value` | |
-| `pressKey({ pid, key, modifiers?, ... })` | `press_key` | |
-| `hotkey({ pid, keys })` | `hotkey` | |
+| `typeText({ pid, text, element_index?, window_id?, delivery_mode? })` | `type_text` | `delivery_mode`: `foreground` needed for Chromium/Electron targets |
+| `setValue({ pid, window_id, element_index, value })` | `set_value` | Background-safe (UIA) |
+| `pressKey({ pid, key, modifiers?, delivery_mode? })` | `press_key` | Same `delivery_mode` rule as typeText |
+| `hotkey({ pid, keys, delivery_mode? })` | `hotkey` | Same `delivery_mode` rule as typeText |
 | `scroll({ pid, direction, ... })` | `scroll` | |
 | `sleep(ms)` | — | Abort-aware delay |
 | `state` / `clearState()` | — | Persist plain data across calls |

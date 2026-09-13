@@ -126,7 +126,7 @@ function createExecHelpers(ctx: ExtensionContext, signal: AbortSignal | undefine
       assertClickTarget(params);
       return record("click", "click", params, { ensureDaemon: true });
     },
-    typeText: async (params: { pid: number; text: string; element_index?: number; window_id?: number }) => {
+    typeText: async (params: { pid: number; text: string; element_index?: number; window_id?: number; delivery_mode?: "background" | "foreground" }) => {
       assertElementWindowPair(params, "windows_cua_type_text");
       return record("typeText", "type_text", params, { ensureDaemon: true });
     },
@@ -138,11 +138,13 @@ function createExecHelpers(ctx: ExtensionContext, signal: AbortSignal | undefine
       modifiers?: string[];
       element_index?: number;
       window_id?: number;
+      delivery_mode?: "background" | "foreground";
     }) => {
       assertElementWindowPair(params, "windows_cua_press_key");
       return record("pressKey", "press_key", params, { ensureDaemon: true });
     },
-    hotkey: async (params: { pid: number; keys: string[] }) => record("hotkey", "hotkey", params, { ensureDaemon: true }),
+    hotkey: async (params: { pid: number; keys: string[]; delivery_mode?: "background" | "foreground" }) =>
+      record("hotkey", "hotkey", params, { ensureDaemon: true }),
     scroll: async (params: {
       pid: number;
       direction: "up" | "down" | "left" | "right";
@@ -414,7 +416,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", async (event) => ({
     systemPrompt:
       event.systemPrompt
-      + "\n\nWhen doing local Windows computer use: if cua-driver is missing, ask the user to run /install-cua-driver first. Use the windows_cua_exec tool for all Windows CUA actions. Inside windows_cua_exec, use helpers like launchApp(), listWindows(), getWindowState(), click(), typeText(), setValue(), pressKey(), hotkey(), scroll(), and checkPermissions(). Helpers return the driver's plain JSON directly, so chaining works (const app = await launchApp({ name: 'Notepad' }); app.pid is valid; listWindows returns { windows: [...] } with window_id per entry). Prefer launchApp() over `start` in the shell; call getWindowState() before element-indexed GUI actions; prefer element_index interactions over raw pixel clicks when the AX/UIA tree exposes the target; after UI-changing actions, re-snapshot with getWindowState() before the next action. If the target window is minimized, occluded, or loses focus, element actions may fail — recover with launchApp() or a pixel click, then re-snapshot. Persist cross-call values in state.* when needed.",
+      + "\n\nWhen doing local Windows computer use: if cua-driver is missing, ask the user to run /install-cua-driver first. Use the windows_cua_exec tool for all Windows CUA actions. Inside windows_cua_exec, use helpers like launchApp(), listWindows(), getWindowState(), click(), typeText(), setValue(), pressKey(), hotkey(), scroll(), and checkPermissions(). Helpers return the driver's plain JSON directly, so chaining works (const app = await launchApp({ name: 'Notepad' }); app.pid is valid; listWindows returns { windows: [...] } with window_id per entry). Prefer launchApp() over `start` in the shell; call getWindowState() before element-indexed GUI actions; prefer element_index interactions over raw pixel clicks when the AX/UIA tree exposes the target; after UI-changing actions, re-snapshot with getWindowState() before the next action. If the target window is minimized, occluded, or loses focus, element actions may fail — recover with launchApp() or a pixel click, then re-snapshot. Synthesized keyboard input (typeText/pressKey/hotkey) accepts delivery_mode 'background'|'foreground': Chromium/Electron windows (Chrome, Edge, VS Code) drop background input, so pass delivery_mode:'foreground' for them upfront or retry with it after a background_unavailable error — foreground steals focus, so mention that to the user. Persist cross-call values in state.* when needed.",
   }));
 
   pi.registerCommand("install-cua-driver", {
@@ -499,6 +501,7 @@ export default function (pi: ExtensionAPI) {
       "The code runs as the body of an async function, so use await and return your final value explicitly.",
       "Available helpers: invoke, checkPermissions, listApps, launchApp, listWindows, getWindowState, click, typeText, setValue, pressKey, hotkey, scroll, sleep, state, clearState, console.",
       "Helpers return the driver's plain JSON, so chaining works: const app = await launchApp({ name: 'Notepad' }); then app.pid or (await listWindows({ pid: app.pid })).windows[0].window_id.",
+      "typeText/pressKey/hotkey accept delivery_mode 'background'|'foreground'. Chromium/Electron surfaces (Chrome, Edge, VS Code) drop background synthesized input — for those targets pass delivery_mode:'foreground' upfront (it steals focus; tell the user), and on a background_unavailable error retry with delivery_mode:'foreground'. Prefer element setValue/click, which run in background via UIA.",
       "If your code uses element_index, call getWindowState() first and usually again after UI-changing actions.",
     ],
     parameters: Type.Object({
