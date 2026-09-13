@@ -7,31 +7,39 @@ click, and type into native desktop applications, no remote sandbox required.
 Inspired by (and structurally mirroring) the community extension
 [`pi-macos-cua`](https://pi.dev/packages/pi-macos-cua) by tanishqkancharla.
 
-## Prerequisites
+## Quick start
 
-1. **Pi coding agent** — [install](https://pi.dev)
-2. **cua-driver for Windows** — install with the official one-liner (no admin required):
+1. Install the [Pi coding agent](https://pi.dev), then:
+
+   ```bash
+   pi install npm:pi-windows-cua
+   ```
+
+2. Start `pi` and run:
+
+   ```
+   /install-cua-driver
+   ```
+
+   That's it — the command runs the official cua-driver installer for you
+   (user-scope, no admin, no permission dialogs on Windows). A manual alternative:
 
    ```powershell
    powershell -c "irm https://cua.ai/driver/install.ps1 | iex"
    ```
 
-   Open a **new** terminal afterwards so PATH refreshes, then verify:
+3. Verify and play:
 
-   ```powershell
-   cua-driver doctor
+   ```
+   /windows-cua-status
    ```
 
-## Install
+   Then just ask Pi: *"use windows_cua_exec to open Notepad and type hello"*.
+
+### Install from a local checkout
 
 ```bash
-pi install npm:pi-windows-cua
-```
-
-Or from a local checkout:
-
-```bash
-pi install E:\path\to\pi-windows-cua
+pi install /absolute/path/to/pi-windows-cua
 ```
 
 ## Usage

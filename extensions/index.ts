@@ -420,7 +420,7 @@ export default function (pi: ExtensionAPI) {
   }));
 
   pi.registerCommand("install-cua-driver", {
-    description: "Print the official cua-driver install command for Windows",
+    description: "Install cua-driver via the official installer (user-scope, no admin)",
     handler: async (_args, ctx) => {
       const config = await loadWindowsCuaConfig(ctx.cwd);
       if (await windowsCua.isInstalled(config)) {
@@ -429,9 +429,35 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      const installCmd = 'powershell -c "irm https://cua.ai/driver/install.ps1 | iex"';
+      ctx.ui.notify("Installing cua-driver via the official installer (user-scope, no admin)…", "info");
+      const result = await piRef.exec(
+        "powershell",
+        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "irm https://cua.ai/driver/install.ps1 | iex"],
+        { timeout: 300000 },
+      );
+      await setStatus(ctx);
+      if (result.code !== 0 || !(await windowsCua.isInstalled(config))) {
+        const installCmd = 'powershell -c "irm https://cua.ai/driver/install.ps1 | iex"';
+        ctx.ui.notify(
+          [
+            `Installer did not complete successfully (exit ${result.code}).`,
+            result.stderr.trim(),
+            "Run it manually in PowerShell instead:",
+            "",
+            installCmd,
+          ]
+            .filter((line) => line !== "")
+            .join("\n"),
+          "error",
+        );
+        return;
+      }
+
+      // resolveBinary probes LOCALAPPDATA directly, so the fresh install is usable
+      // immediately — no terminal restart needed for PATH to refresh.
+      const status = await windowsCua.getStatus(config);
       ctx.ui.notify(
-        `cua-driver is not installed. Run this command in PowerShell (no admin required):\n\n${installCmd}\n\nThen open a NEW terminal so PATH refreshes, run \`cua-driver doctor\` to verify, and try /windows-cua-diagnose.`,
+        `cua-driver installed at ${status.binaryPath}. Run /windows-cua-status to confirm, or start using windows_cua_exec directly.`,
         "info",
       );
     },
